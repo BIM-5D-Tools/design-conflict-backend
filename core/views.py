@@ -161,15 +161,17 @@ class UserViewSet(ModelViewSet):
         if user.is_superuser or user.role == "SUPERUSER":
             return True
 
-        # Kiểm tra bảng UserAppPermission với app code = 'user_management'
         user_perm = UserAppPermission.objects.filter(
             user=user, app__code="user_management"
         ).first()
         if not user_perm:
             return False
 
-        perms = user_perm.permissions
-        return "ALL" in perms or required_permission in perms
+        # Chuyển permissions về dạng danh sách chữ thường để so sánh an toàn
+        perms = [p.lower() for p in (user_perm.permissions or [])]
+        req_perm = required_permission.lower()
+
+        return "all" in perms or req_perm in perms
 
     def list(self, request, *args, **kwargs):
         if not self.check_app_permission(request, "READ"):
@@ -231,7 +233,7 @@ class DesignConflictViewSet(ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     filterset_fields = ["project", "status", "zone"]
-        
+
     @action(detail=False, methods=["get"], url_path="export-report")
     def export_report(self, request):
         if getattr(request.user, "role", None) == "CUSTOMER":
