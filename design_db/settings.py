@@ -36,10 +36,11 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 ALLOWED_HOSTS = [
-    ".localhost,",
+    "localhost",
     ".vercel.app",
     "design-conflict-backend.onrender.com",
     ".onrender.com",
+    "127.0.0.1",
 ]
 
 CORS_ALLOWED_ORIGINS = [

@@ -1,5 +1,7 @@
 # core/views.py
 
+from django.http import HttpResponse
+from django.contrib.auth import authenticate
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.decorators import action
@@ -9,8 +11,10 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import SearchFilter, OrderingFilter
-from django.contrib.auth import authenticate
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+
 from .models import UserAppPermission, App, CustomUser, Project, DesignConflict
 from .serializer import (
     AppSerializer,
@@ -18,7 +22,7 @@ from .serializer import (
     ProjectSerializer,
     DesignConflictSerializer,
 )
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from .services import generate_conflict_excel, generate_conflict_pdf
 
 
 class IsAdminOrSuperuser(BasePermission):
@@ -227,3 +231,40 @@ class DesignConflictViewSet(ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     filterset_fields = ["project", "status", "zone"]
+        
+    @action(detail=False, methods=["get"], url_path="export-report")
+    def export_report(self, request):
+        if getattr(request.user, "role", None) == "CUSTOMER":
+            raise PermissionDenied(
+                "Tài khoản Khách hàng không có quyền xuất file báo cáo!"
+            )
+
+        queryset = self.filter_queryset(self.get_queryset())
+
+        project_id = request.query_params.get("project")
+        project_obj = (
+            Project.objects.filter(id=project_id).first() if project_id else None
+        )
+        export_type = request.query_params.get("type", "excel").lower()
+
+        base_filename = (
+            f"Bao_Cao_Xung_Dot_{project_obj.code if project_obj else 'Tong_Hop'}"
+        )
+
+        if export_type == "pdf":
+            pdf_file = generate_conflict_pdf(queryset, project_obj=project_obj)
+            response = HttpResponse(pdf_file.getvalue(), content_type="application/pdf")
+            response["Content-Disposition"] = (
+                f'attachment; filename="{base_filename}.pdf"'
+            )
+            return response
+        else:
+            excel_file = generate_conflict_excel(queryset, project_obj=project_obj)
+            response = HttpResponse(
+                excel_file.getvalue(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            response["Content-Disposition"] = (
+                f'attachment; filename="{base_filename}.xlsx"'
+            )
+            return response
