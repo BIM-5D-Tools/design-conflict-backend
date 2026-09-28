@@ -35,11 +35,12 @@ DEBUG = os.getenv("DEBUG", "False") == "True"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [".localhost,", ".vercel.app"]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://design-conflict-frontend.vercel.app",
 ]
 
 
@@ -71,7 +72,7 @@ AUTH_USER_MODEL = "core.CustomUser"
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -104,15 +105,15 @@ WSGI_APPLICATION = "design_db.wsgi.application"
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'postgres'),
-        'USER': os.getenv('DB_USER', 'postgres.xogyvzpumfdvfvaokvpt'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'MẬT_KHẨU_DATABASE_CỦA_BẠN'),
-        'HOST': os.getenv('DB_HOST', 'aws-0-ap-northeast-1.pooler.supabase.com'),
-        'PORT': os.getenv('DB_PORT', '5432'),
-        'OPTIONS': {
-            'sslmode': 'require',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("DB_NAME", "postgres"),
+        "USER": os.getenv("DB_USER", "postgres.xogyvzpumfdvfvaokvpt"),
+        "PASSWORD": os.getenv("DB_PASSWORD", "MẬT_KHẨU_DATABASE_CỦA_BẠN"),
+        "HOST": os.getenv("DB_HOST", "aws-0-ap-northeast-1.pooler.supabase.com"),
+        "PORT": os.getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            "sslmode": "require",
         },
     }
 }
@@ -154,6 +155,6 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
