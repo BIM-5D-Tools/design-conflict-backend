@@ -35,7 +35,12 @@ DEBUG = os.getenv("DEBUG", "False") == "True"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
-ALLOWED_HOSTS = [".localhost,", ".vercel.app"]
+ALLOWED_HOSTS = [
+    ".localhost,",
+    ".vercel.app",
+    "design-conflict-backend.onrender.com",
+    ".onrender.com",
+]
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
