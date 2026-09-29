@@ -78,7 +78,7 @@ profile_default/
 !.pixi/config.toml
 
 
-/media
+media/*
 backend/media/
 *.png
 *.jpg

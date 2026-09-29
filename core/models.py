@@ -1,9 +1,9 @@
+import os
 import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
 # Create your models here.
-
 
 class BaseModel(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -44,7 +44,7 @@ class CustomUser(AbstractUser):
     email = models.EmailField(unique=True)
     full_name = models.CharField(max_length=255, blank=True, null=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.CUSTOMER)
-    avatar = models.ImageField(upload_to="users/image/", blank=True, null=True)
+    avatar = models.ImageField(upload_to="users/images/", blank=True, null=True)
     gender = models.CharField(
         max_length=10, choices=Gender.choices, default=Gender.OTHER
     )
@@ -156,8 +156,8 @@ class DesignConflict(BaseModel):
 
 
 class ConflictImage(models.Model):
-    conflict = models.ForeignKey(
-        DesignConflict, on_delete=models.CASCADE, related_name="images"
-    )
-    image = models.ImageField(upload_to="conflicts/")
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+  conflict = models.ForeignKey(
+      DesignConflict, on_delete=models.CASCADE, related_name="images"
+  )
+  image = models.ImageField(upload_to="conflicts/images/")
+  uploaded_at = models.DateTimeField(auto_now_add=True)
