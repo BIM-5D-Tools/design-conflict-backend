@@ -79,6 +79,7 @@ profile_default/
 
 
 media/*
+!media/.gitkeep
 backend/media/
 *.png
 *.jpg
