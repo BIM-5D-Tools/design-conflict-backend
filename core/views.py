@@ -25,17 +25,73 @@ from .serializer import (
 from .services import generate_conflict_excel, generate_conflict_pdf
 
 
+class HasAppPermission(BasePermission):
+    """
+    Kiểm tra quyền truy cập app dựa trên UserAppPermission.
+    ViewSet chỉ cần khai báo thuộc tính: required_app_code = '<app_code>'
+    """
+    # Ánh xạ HTTP method sang quyền tương ứng
+    METHOD_ACTIONS_MAP = {
+        'GET': 'READ',
+        'OPTIONS': 'READ',
+        'HEAD': 'READ',
+        'POST': 'CREATE',
+        'PUT': 'UPDATE',
+        'PATCH': 'UPDATE',
+        'DELETE': 'DELETE',
+    }
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+
+        # Superuser hoặc các vai trò quản trị tối cao luôn được qua
+        if user.is_superuser or getattr(user, 'role', None) in ["SUPERUSER", "ADMIN"]:
+            return True
+
+        # Lấy app_code được chỉ định ở ViewSet
+        app_code = getattr(view, 'required_app_code', None)
+        if not app_code:
+            return True
+
+        # Tìm quyền của user đối với app đó trong database
+        user_perm = UserAppPermission.objects.filter(
+            user=user, 
+            app__code=app_code
+        ).first()
+
+        if not user_perm or not user_perm.permissions:
+            return False
+
+        # Chuẩn hóa về chữ in hoa để so sánh chính xác
+        user_actions = [p.upper() for p in user_perm.permissions]
+
+        # Nếu user có toàn quyền với app đó
+        if "ALL" in user_actions:
+            return True
+
+        # Xác định quyền cần thiết dựa theo phương thức HTTP
+        required_action = self.METHOD_ACTIONS_MAP.get(request.method)
+        if required_action and required_action in user_actions:
+            return True
+
+        return False
+
+
 class IsAdminOrSuperuser(BasePermission):
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        return request.user.is_superuser or request.user.role in ["SUPERUSER", "ADMIN"]
+        return request.user.is_superuser or getattr(request.user, 'role', None) in ["SUPERUSER", "ADMIN"]
 
 
 class AppViewSet(ModelViewSet):
     queryset = App.objects.all().order_by("-created_at")
     serializer_class = AppSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrSuperuser]
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated, HasAppPermission]
+    required_app_code = "app"
 
 
 class LoginView(APIView):
@@ -55,13 +111,11 @@ class LoginView(APIView):
 
         apps_data = []
 
-        if user.is_superuser:
+        if user.is_superuser or user.role in ["SUPERUSER", "ADMIN"]:
             all_apps = App.objects.all()
             apps_data = [{"code": app.code, "permissions": ["ALL"]} for app in all_apps]
         else:
-            user_perms = UserAppPermission.objects.filter(user=user).select_related(
-                "app"
-            )
+            user_perms = UserAppPermission.objects.filter(user=user).select_related("app")
             for perm in user_perms:
                 apps_data.append(
                     {"code": perm.app.code, "permissions": perm.permissions}
@@ -84,19 +138,17 @@ class LoginView(APIView):
 
 class MeView(APIView):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated, IsAdminOrSuperuser]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         user = request.user
         apps_data = []
 
-        if user.is_superuser or user.role == "SUPERUSER":
+        if user.is_superuser or user.role in ["SUPERUSER", "ADMIN"]:
             all_apps = App.objects.all()
             apps_data = [{"code": app.code, "permissions": ["ALL"]} for app in all_apps]
         else:
-            user_perms = UserAppPermission.objects.filter(user=user).select_related(
-                "app"
-            )
+            user_perms = UserAppPermission.objects.filter(user=user).select_related("app")
             for perm in user_perms:
                 apps_data.append(
                     {"code": perm.app.code, "permissions": perm.permissions}
@@ -124,12 +176,14 @@ class MeView(APIView):
 
 class UserViewSet(ModelViewSet):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated, IsAdminOrSuperuser]
+    permission_classes = [IsAuthenticated, HasAppPermission]
+    required_app_code = "user_management"  # Kiểm tra quyền trên app quản lý người dùng
+    
     parser_classes = [
         MultiPartParser,
         FormParser,
         JSONParser,
-    ]  # Hỗ trợ Upload File Ảnh Form-Data
+    ]
     queryset = CustomUser.objects.all().order_by("-date_joined")
     serializer_class = UserSerializer
 
@@ -156,45 +210,6 @@ class UserViewSet(ModelViewSet):
             {"message": "Cập nhật phân quyền thành công!"}, status=status.HTTP_200_OK
         )
 
-    def check_app_permission(self, request, required_permission):
-        user = request.user
-        if user.is_superuser or user.role == "SUPERUSER":
-            return True
-
-        user_perm = UserAppPermission.objects.filter(
-            user=user, app__code="user_management"
-        ).first()
-        if not user_perm:
-            return False
-
-        # Chuyển permissions về dạng danh sách chữ thường để so sánh an toàn
-        perms = [p.lower() for p in (user_perm.permissions or [])]
-        req_perm = required_permission.lower()
-
-        return "all" in perms or req_perm in perms
-
-    def list(self, request, *args, **kwargs):
-        if not self.check_app_permission(request, "READ"):
-            return Response(
-                {"message": "Không có quyền xem danh sách user!"}, status=403
-            )
-        return super().list(request, *args, **kwargs)
-
-    def create(self, request, *args, **kwargs):
-        if not self.check_app_permission(request, "CREATE"):
-            return Response({"message": "Không có quyền tạo tài khoản!"}, status=403)
-        return super().create(request, *args, **kwargs)
-
-    def update(self, request, *args, **kwargs):
-        if not self.check_app_permission(request, "UPDATE"):
-            return Response({"message": "Không có quyền sửa tài khoản!"}, status=403)
-        return super().update(request, *args, **kwargs)
-
-    def destroy(self, request, *args, **kwargs):
-        if not self.check_app_permission(request, "DELETE"):
-            return Response({"message": "Không có quyền xóa tài khoản!"}, status=403)
-        return super().destroy(request, *args, **kwargs)
-
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 6
@@ -204,7 +219,9 @@ class StandardResultsSetPagination(PageNumberPagination):
 
 class ProjectViewSet(ModelViewSet):
     authentication_classes = [TokenAuthentication]
-    permission_classes = [IsAuthenticated, IsAdminOrSuperuser]
+    permission_classes = [IsAuthenticated, HasAppPermission]
+    required_app_code = "project"  # Mã code của App Project trong database (vd: 'project' hoặc 'project_management')
+
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     queryset = Project.objects.all().order_by("-created_at")
     serializer_class = ProjectSerializer
@@ -228,6 +245,10 @@ class ProjectViewSet(ModelViewSet):
 
 
 class DesignConflictViewSet(ModelViewSet):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated, HasAppPermission]
+    required_app_code = "design_conflict"  # Thay đúng bằng app code trong bảng App của bạn
+
     queryset = DesignConflict.objects.all().order_by("-created_at")
     serializer_class = DesignConflictSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
