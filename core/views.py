@@ -253,7 +253,12 @@ class DesignConflictViewSet(ModelViewSet):
     serializer_class = DesignConflictSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
-    filterset_fields = ["project", "status", "zone"]
+    filterset_fields = {
+        'project': ['exact'],
+        'status': ['exact'],
+        'zone': ['exact'],
+        'created_at': ['gte', 'lte'],
+    }
 
     @action(detail=False, methods=["get"], url_path="export-report")
     def export_report(self, request):
